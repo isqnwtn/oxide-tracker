@@ -70,12 +70,15 @@ pub fn test(){
     }
 }
 
+use std::{thread,time};
 pub fn test2(){
    let mut session = Session::open()
     .expect("Could not open session");
-   println!("{:?}",
-    session.active_window()
-     .expect("Error getting active window")
-     .get_title(&session.display)
-     .expect("Error getting title"));
+    for _x in 0..10{
+        let window = session.active_window().expect("couldn't get active window");
+        let title = window.get_title(&session.display).expect("couldnt get title");
+        println!("{:?}",title);
+        let five_sec = time::Duration::from_secs(5);
+        thread::sleep(five_sec);
+    }
 }
