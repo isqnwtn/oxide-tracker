@@ -1,6 +1,5 @@
-mod xfunc;
-use xfunc::test2;
+mod xx;
+use xx::test;
 fn main() {
-    test2();
-    println!("Hello, world!");
+    test();
 }
