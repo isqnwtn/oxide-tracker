@@ -9,7 +9,10 @@ use std::{
     slice,
 };
 
-use crate::xx::Null;
+use crate::xx::{
+    util,
+    Null
+};
 
 pub struct TextProp(pub XTextProperty);
 
@@ -33,21 +36,21 @@ impl TextProp{
     pub fn show_metadata(&self) -> Result<String,Null> {
         if !self.0.value.is_null(){
             let text = unsafe{CStr::from_ptr(self.0.value as *mut i8)};
-            Ok(format!("value:{:?} enoding:{} format:{} nitems:{}"
-                       ,text,self.0.encoding,self.0.format,self.0.nitems))
+            Ok(format!("enoding:{} format:{} nitems:{}"
+                       ,self.0.encoding,self.0.format,self.0.nitems))
         }
         else {
             Err(Null)
         }
     }
-    pub fn get_data_as<T:Clone+PartialEq>(&self,nullval:T) -> Result<Vec<T>,Null>{
+    pub fn get_data_as<T:Clone+PartialEq>(&self,nullval:T) -> Result<Vec<Vec<T>>,Null>{
         if !self.0.value.is_null(){
             let val = unsafe{slice::from_raw_parts(
                self.0.value as *const T, self.0.nitems as usize
             )};
-            let mut vector = val.to_vec();
-            vector.retain(|x| *x != nullval);
-            Ok(vector)
+            let vector = val.to_vec();
+            let final_vec = util::split_vec(vector, nullval);
+            Ok(final_vec)
         }
         else{
             Err(Null)
