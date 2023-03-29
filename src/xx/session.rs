@@ -43,9 +43,9 @@ impl Session{
         unsafe{
             XGetTextProperty(self.display.0, rwin.0, &mut tp.0, a.0)
         };
-        let text = tp.get_metadata().expect("couldn't get textprop metadata");
-        let dat = tp.get_data().expect("aaa!!");
+        let text = tp.show_metadata().expect("couldn't get textprop metadata");
+        let dat = tp.get_data_as(0 as u8).expect("aaa!!");
         println!("metadata: {}", text);
-        println!("data: {}",dat);
+        println!("data: {:?}",dat);
     }
 }

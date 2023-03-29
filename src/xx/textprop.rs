@@ -27,7 +27,10 @@ impl TextProp{
     pub fn from_prop(prop: XTextProperty) -> Self{
         TextProp(prop)
     }
-    pub fn get_metadata(&self) -> Result<String,Null> {
+    pub fn format(&self)->usize{
+        self.0.format as usize
+    }
+    pub fn show_metadata(&self) -> Result<String,Null> {
         if !self.0.value.is_null(){
             let text = unsafe{CStr::from_ptr(self.0.value as *mut i8)};
             Ok(format!("value:{:?} enoding:{} format:{} nitems:{}"
@@ -37,19 +40,14 @@ impl TextProp{
             Err(Null)
         }
     }
-    pub fn get_data(&self) -> Result<String,Null>{
+    pub fn get_data_as<T:Clone+PartialEq>(&self,nullval:T) -> Result<Vec<T>,Null>{
         if !self.0.value.is_null(){
-            let val = match self.0.format{
-                8 => {
-                    unsafe{slice::from_raw_parts(
-                    self.0.value as *const i8, self.0.nitems as usize )
-                    }
-                }
-                16 => {panic!("aaaa!!")}
-                32 => {panic!("aaaaa!!")}
-                _ => {panic!("aaaaa!!")}
-            };
-            Ok(format!("{:?}",val))
+            let val = unsafe{slice::from_raw_parts(
+               self.0.value as *const T, self.0.nitems as usize
+            )};
+            let mut vector = val.to_vec();
+            vector.retain(|x| *x != nullval);
+            Ok(vector)
         }
         else{
             Err(Null)
@@ -60,6 +58,8 @@ impl TextProp{
 
 impl Drop for TextProp{
     fn drop(&mut self){
-        unsafe{ XFree(self.0.value as *mut c_void) };
+        if !self.0.value.is_null(){
+            unsafe{ XFree(self.0.value as *mut c_void) };
+        }
     }
 }
