@@ -1,4 +1,5 @@
 use x11::xlib::{
+    XGetTextProperty,
     XTextProperty,
     XFree,
 };
@@ -10,8 +11,11 @@ use std::{
 };
 
 use crate::xx::{
+    Window,
+    Display,
+    Atom,
     util,
-    Null
+    Null,
 };
 
 pub struct TextProp(pub XTextProperty);
@@ -29,6 +33,15 @@ impl TextProp{
     }
     pub fn from_prop(prop: XTextProperty) -> Self{
         TextProp(prop)
+    }
+    pub fn prop_for_atom(display: &Display,atom_str:&str)->TextProp{
+        let a = Atom::new(display,atom_str).unwrap();
+        let mut tp = TextProp::default();
+        let rwin = Window::default_root_window(display);
+        unsafe{
+            XGetTextProperty(display.0, rwin.0, &mut tp.0, a.0)
+        };
+        tp
     }
     pub fn format(&self)->usize{
         self.0.format as usize

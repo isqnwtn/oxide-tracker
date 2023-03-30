@@ -30,16 +30,10 @@ impl Session{
         self.root_window = Some(Window::default_root_window(&self.display));
     }
     pub fn get_desktops(&self)->Vec<String>{
-        let a = Atom::new(&self.display,"_NET_DESKTOP_NAMES").unwrap();
-        let mut tp = TextProp::default();
-        let rwin = self.root_window.unwrap();
-        unsafe{
-            XGetTextProperty(self.display.0, rwin.0, &mut tp.0, a.0)
-        };
+        let tp = TextProp::prop_for_atom(&self.display, "_NET_DESKTOP_NAMES");
         // the textproperty as to be characters
         assert_eq!(tp.format(),8);
-        let text = tp.show_metadata().expect("couldn't get textprop metadata");
-        let dat = tp.get_data_as(0 as u8).expect("aaa!!");
+        let dat = tp.get_data_as(0 as u8).expect("failed to retreive desktop data!!");
         util::u8_to_string(dat)
     }
 }
