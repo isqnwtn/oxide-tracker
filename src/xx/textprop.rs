@@ -15,7 +15,7 @@ use crate::xx::{
     Display,
     Atom,
     util,
-    Null,
+    X11Error
 };
 
 pub struct TextProp(pub XTextProperty);
@@ -34,39 +34,36 @@ impl TextProp{
     pub fn from_prop(prop: XTextProperty) -> Self{
         TextProp(prop)
     }
-    pub fn prop_for_atom(display: &Display,atom_str:&str)->TextProp{
-        let a = Atom::new(display,atom_str).unwrap();
+    pub fn prop_for_atom(win: &Window,display: &Display,atom_str:&str)->Result<TextProp,X11Error>{
+        let a = Atom::new(display,atom_str)?;
         let mut tp = TextProp::default();
-        let rwin = Window::default_root_window(display);
         unsafe{
-            XGetTextProperty(display.0, rwin.0, &mut tp.0, a.0)
+            XGetTextProperty(display.0, win.0, &mut tp.0, a.0)
         };
-        tp
+        Ok(tp)
     }
     pub fn format(&self)->usize{
         self.0.format as usize
     }
-    pub fn show_metadata(&self) -> Result<String,Null> {
+    pub fn show_metadata(&self) -> Result<String,X11Error> {
         if !self.0.value.is_null(){
-            let text = unsafe{CStr::from_ptr(self.0.value as *mut i8)};
             Ok(format!("enoding:{} format:{} nitems:{}"
                        ,self.0.encoding,self.0.format,self.0.nitems))
         }
         else {
-            Err(Null)
+            Err(X11Error::Invalid)
         }
     }
-    pub fn get_data_as<T:Clone+PartialEq>(&self,nullval:T) -> Result<Vec<Vec<T>>,Null>{
+    pub fn get_data_as<T:Clone+PartialEq>(&self) -> Result<Vec<T>,X11Error>{
         if !self.0.value.is_null(){
             let val = unsafe{slice::from_raw_parts(
                self.0.value as *const T, self.0.nitems as usize
             )};
             let vector = val.to_vec();
-            let final_vec = util::split_vec(vector, nullval);
-            Ok(final_vec)
+            Ok(vector)
         }
         else{
-            Err(Null)
+            Err(X11Error::ParseError)
         }
     }
 

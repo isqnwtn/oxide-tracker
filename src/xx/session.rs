@@ -5,7 +5,8 @@ use crate::xx::{
     Display,
     Window,
     TextProp,
-    Null, util,
+    util,
+    X11Error
 };
 
 pub struct Session{
@@ -14,7 +15,7 @@ pub struct Session{
 }
 
 impl Session{
-    pub fn open() -> Result<Self,Null>{
+    pub fn open() -> Result<Self,X11Error>{
         Ok( Self{
             display: Display::open()?,
             root_window: None,
@@ -29,11 +30,21 @@ impl Session{
     pub fn set_root_window(&mut self){
         self.root_window = Some(Window::default_root_window(&self.display));
     }
-    pub fn get_desktops(&self)->Vec<String>{
-        let tp = TextProp::prop_for_atom(&self.display, "_NET_DESKTOP_NAMES");
+    pub fn get_desktops(&self)->Result<Vec<String>,X11Error>{
+        let win = self.root_window.ok_or(X11Error::Unset)?;
+        let tp = TextProp::prop_for_atom(&win,&self.display, "_NET_DESKTOP_NAMES")?;
         // the textproperty as to be characters
-        assert_eq!(tp.format(),8);
-        let dat = tp.get_data_as(0 as u8).expect("failed to retreive desktop data!!");
-        util::u8_to_string(dat)
+        if tp.format() != 8 {return Err(X11Error::UnknownFormat)}
+        let dat : Vec<u8> = tp.get_data_as()?;
+        Ok(util::split_nullstrings(dat))
+    }
+    pub fn get_client_list(&self)->Result<(),X11Error>{
+        let win = self.root_window.ok_or(X11Error::Unset)?;
+        let tp = TextProp::prop_for_atom(&win,&self.display, "_NET_CLIENT_LIST")?;
+        // the textproperty has to be 32bits
+        if tp.format() != 32 {return Err(X11Error::UnknownFormat)}
+        let cl : Vec<usize> = tp.get_data_as()?;
+        println!("format: {} clientList:{:?}",tp.format(),cl);
+        Ok(())
     }
 }

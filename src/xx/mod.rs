@@ -22,6 +22,8 @@ pub enum X11Error{
     NullError,
     Invalid,
     ParseError,
+    UnknownFormat,
+    Unset,
 }
 
 pub fn test(){
@@ -30,4 +32,5 @@ pub fn test(){
     session.set_root_window();
     let desks = session.get_desktops();
     println!("{:?}",desks);
+    session.get_client_list();
 }
