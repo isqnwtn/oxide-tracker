@@ -9,6 +9,7 @@ pub use self::{
     atom::Atom,
     display::Display,
     window::Window,
+    window::WinProp,
     session::Session,
     textprop::TextProp,
 };
@@ -32,5 +33,8 @@ pub fn test(){
     session.set_root_window();
     let desks = session.get_desktops();
     println!("{:?}",desks);
-    session.get_client_list();
+    let windows = session.get_client_list();
+    for w in windows.expect(""){
+        println!("{:?}",w);
+    }
 }

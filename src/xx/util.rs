@@ -1,3 +1,5 @@
+use super::X11Error;
+
 pub fn u8_to_string(v:Vec<Vec<u8>>)->Vec<String>{
     let mut s_list:Vec<String> = Vec::new();
         for val in v{
@@ -44,4 +46,17 @@ pub fn split_nullstrings(vec:Vec<u8>)->Vec<String>{
         final_vec.push(String::from(s));
     }
     final_vec
+}
+
+use std::process::Command;
+pub fn proc_from_pid(pid: usize) -> Option<String>{
+    let proc_arg = format!("/proc/{}/exe",pid);
+    let op = Command::new("ls")
+        .arg("-l").arg(proc_arg)
+        .output().ok()?;
+    let op_str = std::str::from_utf8(&op.stdout).ok()?;
+    let pname = op_str.split("/").last()?;
+    let mut s_pname = String::from(pname);
+    s_pname.pop()?;
+    Some(s_pname)
 }

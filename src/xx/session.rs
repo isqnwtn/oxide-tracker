@@ -4,10 +4,12 @@ use crate::xx::{
     Atom,
     Display,
     Window,
+    WinProp,
     TextProp,
     util,
     X11Error
 };
+
 
 pub struct Session{
     pub display: Display,
@@ -38,13 +40,16 @@ impl Session{
         let dat : Vec<u8> = tp.get_data_as()?;
         Ok(util::split_nullstrings(dat))
     }
-    pub fn get_client_list(&self)->Result<(),X11Error>{
+    pub fn get_client_list(&self)->Result<Vec<WinProp>,X11Error>{
         let win = self.root_window.ok_or(X11Error::Unset)?;
         let tp = TextProp::prop_for_atom(&win,&self.display, "_NET_CLIENT_LIST")?;
         // the textproperty has to be 32bits
         if tp.format() != 32 {return Err(X11Error::UnknownFormat)}
-        let cl : Vec<usize> = tp.get_data_as()?;
-        println!("format: {} clientList:{:?}",tp.format(),cl);
-        Ok(())
+        let windows = Window::windows_from_text_prop(&tp)?;
+        let wins : Vec<WinProp> = windows
+            .iter()
+            .filter_map(|x| x.get_prop(&self.display).ok())
+            .collect();
+        Ok(wins)
     }
 }
