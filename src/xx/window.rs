@@ -30,7 +30,8 @@ pub struct Window(pub XWindow);
 pub struct WinProp{
     w_title: Option<String>,
     w_program: Option<String>,
-    w_desktop: Option<String>,
+    w_desktop: Option<usize>,
+    w_active: bool,
 }
 
 impl Window{
@@ -47,7 +48,7 @@ impl Window{
         }
 
     }
-    pub fn get_prop(&self,display: &Display)->Result<WinProp,X11Error>{
+    pub fn get_prop(&self,display: &Display,awin:&usize)->Result<WinProp,X11Error>{
         // getting window name
         let tpw = TextProp::prop_for_atom(&self, display, "_NET_WM_NAME")?;
         let win_names = tpw.get_data_as()?;
@@ -56,16 +57,20 @@ impl Window{
         else{Some(win_name.remove(0))};
 
         //program name
+        // TODO: Implement this using XGetClassHint
         let tpp = TextProp::prop_for_atom(&self, display, "_NET_WM_PID")?;
-        let mut pids : Vec<usize> = tpp.get_data_as()?;
-        let pid = if pids.is_empty(){None}
-        else{util::proc_from_pid(pids.remove(0))};
+        let pid = tpp.get_single_prop()?;
+        let progname = util::proc_from_pid(pid);
 
+        //desktop
+        let tpd = TextProp::prop_for_atom(&self, display, "_NET_WM_DESKTOP")?;
+        let wdesk : usize = tpd.get_single_prop()?;
 
         let winprop = WinProp{
             w_title: win_title,
-            w_program: pid,
-            w_desktop: None,
+            w_program: progname,
+            w_desktop: Some(wdesk),
+            w_active: (*awin as u64 == self.0)
         };
         Ok(winprop)
     }

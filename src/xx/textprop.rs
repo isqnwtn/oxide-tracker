@@ -66,6 +66,18 @@ impl TextProp{
             Err(X11Error::ParseError)
         }
     }
+    pub fn get_single_prop<T:Clone+PartialEq+Copy>(&self) -> Result<T,X11Error>{
+        if !self.0.value.is_null(){
+            let val = unsafe{slice::from_raw_parts(
+                self.0.value as *const T, self.0.nitems as usize)};
+            let vec = val.to_vec();
+            let first = vec.first().ok_or(X11Error::ParseError)?;
+            Ok(*first)
+        }
+        else{
+            Err(X11Error::ParseError)
+        }
+    }
 
 }
 

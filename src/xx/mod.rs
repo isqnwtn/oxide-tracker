@@ -27,14 +27,20 @@ pub enum X11Error{
     Unset,
 }
 
+use std::{thread,time};
 pub fn test(){
     println!("testing the x11 functions..");
     let mut session = Session::open().expect("couldn't open session");
     session.set_root_window();
     let desks = session.get_desktops();
     println!("{:?}",desks);
-    let windows = session.get_client_list();
-    for w in windows.expect(""){
-        println!("{:?}",w);
+    let five_sec = time::Duration::from_secs(5);
+    for _ in 0..1{
+        let windows = session.get_client_list();
+        for w in windows.expect(""){
+            println!("{:?}",w);
+        }
+        println!("==========");
+        thread::sleep(five_sec);
     }
 }

@@ -46,9 +46,12 @@ impl Session{
         // the textproperty has to be 32bits
         if tp.format() != 32 {return Err(X11Error::UnknownFormat)}
         let windows = Window::windows_from_text_prop(&tp)?;
+
+        let tpa = TextProp::prop_for_atom(&win, &self.display, "_NET_ACTIVE_WINDOW")?;
+        let active_window : usize = tpa.get_single_prop()?;
         let wins : Vec<WinProp> = windows
             .iter()
-            .filter_map(|x| x.get_prop(&self.display).ok())
+            .filter_map(|x| x.get_prop(&self.display,&active_window).ok())
             .collect();
         Ok(wins)
     }
