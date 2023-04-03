@@ -11,84 +11,67 @@ use std::{
     ops::Drop,
     os::raw::c_void,
     ptr::null_mut,
-    slice,
+    slice, fmt::format,
 };
 
 use crate::xfunc::{
     Atom,
     Display,
-    NET_ACTIVE_WINDOW,
-    NotSupported,
-    Null,
-    util::get_window_property,
-    Session,
+    TextProp,
 };
+
+use super::{X11Error, util};
+
 
 #[derive(Copy, Clone, Debug)]
 pub struct Window(pub XWindow);
 
+#[derive(Clone, Debug)]
+pub struct WinProp{
+    w_title: Option<String>,
+    w_program: Option<String>,
+    w_desktop: Option<usize>,
+    w_active: bool,
+}
+
 impl Window{
     pub fn default_root_window(display: &Display) -> Self{
-        let win = unsafe{ XDefaultRootWindow(display.0) };
+        let win = unsafe{XDefaultRootWindow(display.0)};
         Window(win)
     }
-    pub fn get_title(self, display: &Display) -> Result<WindowTitle, Null> {
-        let mut text_property = XTextProperty {
-            value: null_mut(),
-            encoding: 0,
-            format: 0,
-            nitems: 0,
-        };
-        unsafe {
-            XGetWMName(
-                display.0,
-                self.0,
-                &mut text_property,
-            )
-        };
-        if !text_property.value.is_null() {
-            let text = unsafe { CStr::from_ptr(text_property.value as *mut i8) };
-            Ok(WindowTitle(text))
-        } else { Err(Null) }
-    }
+    pub fn windows_from_text_prop(tp: &TextProp) -> Result<Vec<Window>,X11Error>{
+        if tp.format() != 32 {return Err(X11Error::UnknownFormat)}
+        else{
+           let wins : Vec<usize> = tp.get_data_as()?;
+           let windows = wins.into_iter().map(|x| Window(x as XWindow)).collect();
+            Ok(windows)
+        }
 
-    pub fn active_window(session: &mut Session) -> Result<Self, NotSupported> {
-        let Session { display, root_window, active_window_atom, .. } = session;
-        let root_window = root_window.get_or_insert_with(|| Window::default_root_window(display));
-        let active_window_atom = active_window_atom.get_or_insert_with(|| Atom::new(display, NET_ACTIVE_WINDOW).unwrap());
-        let response = unsafe{get_window_property(display, *root_window, *active_window_atom, XA_WINDOW)?};
-        let window = match response.actual_format_return {
-            8 => {
-                unsafe{slice::from_raw_parts(response.proper_return as *const u8, response.nitems_return as usize)}
-                    .first()
-                    .map(|x| Window(*x as XWindow))
-            },
-            16 => {
-                unsafe{slice::from_raw_parts(response.proper_return as *const u16, response.nitems_return as usize)}
-                    .first()
-                    .map(|x| Window(*x as XWindow))
-            },
-            32 => {
-                unsafe{slice::from_raw_parts(response.proper_return as *const usize, response.nitems_return as usize)}
-                    .first()
-                    .map(|x| Window(*x as XWindow))
-            },
-            _ => { None },
-        };
-        unsafe{XFree(response.proper_return as *mut c_void)};
-        Ok(window.ok_or(NotSupported)?)
     }
-}
+    pub fn get_prop(&self,display: &Display,awin:&usize)->Result<WinProp,X11Error>{
+        // getting window name
+        let tpw = TextProp::prop_for_atom(&self, display, "_NET_WM_NAME")?;
+        let win_names = tpw.get_data_as()?;
+        let mut win_name = util::split_nullstrings(win_names);
+        let win_title = if win_name.is_empty(){None}
+        else{Some(win_name.remove(0))};
 
-#[derive(Debug)]
-pub struct WindowTitle<'a>(&'a CStr);
-impl<'a> AsRef<CStr> for WindowTitle<'a> {
-    fn as_ref(&self) -> &CStr {
-        self.0
-    }
-}
-impl<'a> Drop for WindowTitle<'a> {
-    fn drop(&mut self) {
-        unsafe { XFree(self.0.as_ptr() as *mut c_void) };
+        //program name
+        // TODO: Implement this using XGetClassHint
+        let tpp = TextProp::prop_for_atom(&self, display, "_NET_WM_PID")?;
+        let pid = tpp.get_single_prop()?;
+        let progname = util::proc_from_pid(pid);
+
+        //desktop
+        let tpd = TextProp::prop_for_atom(&self, display, "_NET_WM_DESKTOP")?;
+        let wdesk : usize = tpd.get_single_prop()?;
+
+        let winprop = WinProp{
+            w_title: win_title,
+            w_program: progname,
+            w_desktop: Some(wdesk),
+            w_active: (*awin as u64 == self.0)
+        };
+        Ok(winprop)
     }
 }

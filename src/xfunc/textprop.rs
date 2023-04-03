@@ -10,7 +10,7 @@ use std::{
     slice,
 };
 
-use crate::xx::{
+use crate::xfunc::{
     Window,
     Display,
     Atom,

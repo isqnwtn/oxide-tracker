@@ -1,53 +1,58 @@
-use x11::xlib::{
-    Window as XWindow,
-    XA_WINDOW,
-    XFree,
-};
-use std::{
-    os::raw::c_void,
-    slice,
-};
+use x11::xlib::XGetTextProperty;
+
 use crate::xfunc::{
     Atom,
     Display,
-    NET_CLIENT_LIST,
-    NotSupported,
-    Null,
     Window,
+    WinProp,
+    TextProp,
+    util,
+    X11Error
 };
 
-pub struct Session {
-    /// A display that has been opened.
+
+pub struct Session{
     pub display: Display,
-    /// The root window of the display.
     pub root_window: Option<Window>,
-    /// The atom that represents the client_list property.
-    pub client_list_atom: Option<Atom>,
-    /// The atom that represents the active_window property.
-    pub active_window_atom: Option<Atom>,
 }
 
 impl Session{
-    pub fn open() -> Result<Self, Null>{
+    pub fn open() -> Result<Self,X11Error>{
         Ok( Self{
             display: Display::open()?,
             root_window: None,
-            client_list_atom: None,
-            active_window_atom: None,
         } )
     }
-
-    pub fn from_display(display: Display) -> Self {
-        Self {
+    pub fn from_display(display:Display) -> Self{
+        Self{
             display,
-            root_window: None,
-            client_list_atom: None,
-            active_window_atom: None,
+            root_window:None,
         }
     }
+    pub fn set_root_window(&mut self){
+        self.root_window = Some(Window::default_root_window(&self.display));
+    }
+    pub fn get_desktops(&self)->Result<Vec<String>,X11Error>{
+        let win = self.root_window.ok_or(X11Error::Unset)?;
+        let tp = TextProp::prop_for_atom(&win,&self.display, "_NET_DESKTOP_NAMES")?;
+        // the textproperty as to be characters
+        if tp.format() != 8 {return Err(X11Error::UnknownFormat)}
+        let dat : Vec<u8> = tp.get_data_as()?;
+        Ok(util::split_nullstrings(dat))
+    }
+    pub fn get_client_list(&self)->Result<Vec<WinProp>,X11Error>{
+        let win = self.root_window.ok_or(X11Error::Unset)?;
+        let tp = TextProp::prop_for_atom(&win,&self.display, "_NET_CLIENT_LIST")?;
+        // the textproperty has to be 32bits
+        if tp.format() != 32 {return Err(X11Error::UnknownFormat)}
+        let windows = Window::windows_from_text_prop(&tp)?;
 
-    /// Gets the currently active window in the display.
-    pub fn active_window(&mut self) -> Result<Window, NotSupported> {
-        Window::active_window(self)
+        let tpa = TextProp::prop_for_atom(&win, &self.display, "_NET_ACTIVE_WINDOW")?;
+        let active_window : usize = tpa.get_single_prop()?;
+        let wins : Vec<WinProp> = windows
+            .iter()
+            .filter_map(|x| x.get_prop(&self.display,&active_window).ok())
+            .collect();
+        Ok(wins)
     }
 }

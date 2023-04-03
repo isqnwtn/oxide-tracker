@@ -3,11 +3,11 @@ use x11::xlib::{
     True as XTrue,
     XInternAtom,
 };
-use std::ffi::{
-    CString,
-    NulError,
+use std::ffi::CString;
+use crate::xfunc::{
+    Display,
+    X11Error,
 };
-use crate::xfunc::Display;
 
 /// A wrapper around a [x11::xlib::Atom].
 ///
@@ -25,8 +25,8 @@ impl Atom {
     /// Atom::new("_NET_ClIENT_LIST")
     ///     .expect("Could not create the CString");
     /// ```
-    pub fn new<T: Into<Vec<u8>>>(display: &Display, text: T) -> Result<Self, NulError> {
-        let text = CString::new(text)?;
+    pub fn new<T: Into<Vec<u8>>>(display: &Display, text: T) -> Result<Self, X11Error> {
+        let text = CString::new(text).map_err(|_x|X11Error::Invalid)?;
         let atom = unsafe { XInternAtom(display.0, text.as_ptr(), XTrue) };
         Ok(Atom(atom))
     }

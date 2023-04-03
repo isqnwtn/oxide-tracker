@@ -7,7 +7,7 @@ use std::{
     ops::Drop,
     ptr::null,
 };
-use crate::xfunc::Null;
+use crate::xfunc::X11Error;
 
 /// The Display Struct is just a wrapper of a [*mut Display] from XLib.
 ///
@@ -17,10 +17,10 @@ impl Display {
     /// Opens a connection to the x11 server.
     ///
     /// Will return an error of [Null] if the returned Display pointer is a null pointer.
-    pub fn open() -> Result<Self, Null> {
+    pub fn open() -> Result<Self, X11Error> {
         let x_display = unsafe { XOpenDisplay( null() ) };
         if x_display.is_null() {
-            return Err(Null)
+            return Err(X11Error::NullError)
         }
         Ok(Display(x_display))
     }
