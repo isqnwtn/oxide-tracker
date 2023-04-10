@@ -1,119 +1,91 @@
-use std::{fs,collections::HashMap, path::PathBuf, io::Read};
+use std::{fs,collections::HashMap, path::PathBuf, io::{Read, BufReader}};
 use serde::{Serialize,Deserialize};
 
-use super::CaptureError;
-
-pub struct Desktops{
-    desktop_count: usize,
-    desktops: Vec<String>,
-}
-
-impl Desktops{
-    pub fn empty()->Desktops{
-        Desktops { desktop_count: 0, desktops: Vec::new() }
-    }
-    pub fn from(v:Vec<String>)->Desktops{
-       Desktops { desktop_count: v.len(), desktops: v }
-    }
-}
-
-pub struct Programs{
-    pgm_count: usize,
-    pgm_map:HashMap<String,usize>,
-}
-
-impl Programs{
-    pub fn empty()->Programs{
-        Programs { pgm_count: 0, pgm_map: HashMap::new() }
-    }
-    pub fn from(v:Vec<(String,usize)>)->Programs{
-        Programs { pgm_count: v.len(), pgm_map: v.into_iter().collect() }
-    }
-}
-
-pub struct Titles{
-    title_count: usize,
-    title_map:HashMap<String,usize>,
-}
-
-impl Titles{
-    pub fn empty()->Titles{
-        Titles { title_count: 0, title_map: HashMap::new() }
-    }
-    pub fn from(v:Vec<(String,usize)>)->Titles{
-        Titles { title_count: v.len(), title_map: v.into_iter().collect() }
-    }
-}
+use crate::capture::CaptureError;
 
 pub struct FilePointers{
-    deskpgm: fs::File,
-    title: fs::File,
+    meta: fs::File,
 }
 impl FilePointers{
     pub fn from_path(path:&PathBuf)->Result<FilePointers,CaptureError>{
-        let deskpgm_path = path.join("deskpgm.dat");
-        let title_path = path.join("titles.dat");
-        let deskpgm_file = fs::File::open(deskpgm_path)
-            .map_err(|_|CaptureError::FileError)?;
-        let title_file = fs::File::open(title_path)
+        let meta_path = path.join("meta.dat");
+        let meta_file = fs::File::open(meta_path)
             .map_err(|_|CaptureError::FileError)?;
         let fp = FilePointers{
-            deskpgm: deskpgm_file,
-            title: title_file,
+            meta: meta_file,
         };
         Ok(fp)
     }
 }
 
-
-#[derive(Serialize,Deserialize,PartialEq,Debug)]
-pub struct SaveInfoDeskPgm{
-    save_desk : Vec<String>,
-    save_pgm : Vec<(String,usize)>,
+#[derive(Serialize,Deserialize)]
+pub struct TwoHash{
+    size: usize,
+    fw: HashMap<String,usize>,
+    bw: HashMap<usize,String>,
 }
-
-#[derive(Serialize,Deserialize,PartialEq,Debug)]
-pub struct SaveInfoTitle{
-    save_title: Vec<(String,usize)>
-}
-
-
-
-pub struct CaptureData{
-    desk_dat: Desktops,
-    pgm_dat: Programs,
-    title_dat: Titles,
-    changed: bool,
-}
-impl CaptureData{
-    pub fn empty()->CaptureData{
-        CaptureData
-        { desk_dat: Desktops::empty(),
-          pgm_dat: Programs::empty(),
-          title_dat: Titles::empty(),
-          changed: false,
-        }
+impl TwoHash{
+    pub fn new()->TwoHash{
+       TwoHash { size: 0, fw: HashMap::new(), bw: HashMap::new() }
     }
-    pub fn load_from_file(fp: &mut FilePointers)->Result<CaptureData,std::io::Error>{
-        let mut deskpgm_str = String::new();
-        let mut title_str = String::new();
-        fp.deskpgm.read_to_string(&mut deskpgm_str)?;
-        fp.title.read_to_string(&mut title_str)?;
-        let save_info_deskpgm  = serde_json::from_str::<SaveInfoDeskPgm>(&deskpgm_str)?;
-        let save_info_title = serde_json::from_str::<SaveInfoTitle>(&title_str)?;
-        Ok(CaptureData {
-            desk_dat: Desktops::from(save_info_deskpgm.save_desk),
-            pgm_dat: Programs::from(save_info_deskpgm.save_pgm),
-            title_dat: Titles::from(save_info_title.save_title),
-            changed: false,
-        })
+    pub fn capacity(&self)->usize{
+        self.size
     }
-    pub fn save_to_file(&self,fp: &mut FilePointers)->Result<(),std::io::Error>{
-        if !self.changed{
-            Ok(())
-        }
+    pub fn fw_exists(&self,name:&str)->bool{
+       self.fw.contains_key(name)
+    }
+    pub fn fw_lookup(&self,name:&str)->Option<&usize>{
+        self.fw.get(name)
+    }
+    pub fn bw_lookup(&self,id:&usize)->Option<&String>{
+        self.bw.get(id)
+    }
+    pub fn bw_exists(&self,id:&usize)->bool{
+        self.bw.contains_key(&id)
+    }
+    // returns true if the addition was successfull, false otherwise
+    pub fn add(&mut self,name:&str)->bool{
+       let new_id = self.size + 1;
+       if !self.fw_exists(name){
+           self.fw.insert(String::from(name), new_id);
+           self.bw.insert(new_id, String::from(name));
+           self.size = self.size +1;
+           true
+       }
         else{
-            Ok(())
+            false
         }
+    }
+}
+
+#[derive(Serialize,Deserialize)]
+pub struct MetaData{
+    desk_dat: Vec<String>,
+    pgm_dat: TwoHash,
+    title_dat: TwoHash,
+}
+impl MetaData{
+    pub fn empty()->MetaData{
+        MetaData
+        { desk_dat: Vec::new(),
+          pgm_dat: TwoHash::new(),
+          title_dat: TwoHash::new(),
+        }
+    }
+    pub fn load_from_file(fp: &mut FilePointers)->Result<MetaData,serde_json::Error>{
+        let reader = BufReader::new(&fp.meta);
+        serde_json::from_reader(reader)
+    }
+    pub fn save_changes(&mut self,fp: &mut FilePointers)->Result<(),serde_json::Error>{
+        serde_json::to_writer(&fp.meta, &self)
+    }
+    pub fn set_desks(&mut self,desks: Vec<String>){
+        self.desk_dat = desks;
+    }
+    pub fn add_pgm(&mut self,pgm: &str)->bool{
+        self.pgm_dat.add(pgm)
+    }
+    pub fn add_title(&mut self,title: &str)->bool{
+        self.title_dat.add(title)
     }
 }
