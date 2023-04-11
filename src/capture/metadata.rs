@@ -1,24 +1,39 @@
-use std::{fs,collections::HashMap, path::PathBuf, io::{Read, BufReader}};
+use std::{fs,collections::HashMap, path::{PathBuf, self}, io::{Read, BufReader}};
 use serde::{Serialize,Deserialize};
 
 use crate::capture::CaptureError;
 
+use super::CaptureConfig;
+
 pub struct FilePointers{
     meta: fs::File,
+    meta_read: fs::File,
+    meta_path: PathBuf,
 }
 impl FilePointers{
-    pub fn from_path(path:&PathBuf)->Result<FilePointers,CaptureError>{
-        let meta_path = path.join("meta.dat");
-        let meta_file = fs::File::open(meta_path)
+    pub fn from_config(cc:&CaptureConfig)->Result<FilePointers,CaptureError>{
+        let path = path::Path::new(&cc.data_path);
+        let meta_path = path.join("meta").join("meta.dat");
+
+        let meta_file = fs::File::options()
+            .read(true)
+            .write(true)
+            .open(&meta_path)
             .map_err(|_|CaptureError::FileError)?;
+
+        let meta_read_file = fs::File::open(&meta_path)
+            .map_err(|_|CaptureError::FileError)?;
+
         let fp = FilePointers{
             meta: meta_file,
+            meta_read: meta_read_file,
+            meta_path: meta_path,
         };
         Ok(fp)
     }
 }
 
-#[derive(Serialize,Deserialize)]
+#[derive(Serialize,Deserialize,Debug)]
 pub struct TwoHash{
     size: usize,
     fw: HashMap<String,usize>,
@@ -58,7 +73,7 @@ impl TwoHash{
     }
 }
 
-#[derive(Serialize,Deserialize)]
+#[derive(Serialize,Deserialize,Debug)]
 pub struct MetaData{
     desk_dat: Vec<String>,
     pgm_dat: TwoHash,
@@ -73,7 +88,8 @@ impl MetaData{
         }
     }
     pub fn load_from_file(fp: &mut FilePointers)->Result<MetaData,serde_json::Error>{
-        let reader = BufReader::new(&fp.meta);
+        let file = fs::File::open(&fp.meta_path).expect("cant open meta file");
+        let reader = BufReader::new(file);
         serde_json::from_reader(reader)
     }
     pub fn save_changes(&mut self,fp: &mut FilePointers)->Result<(),serde_json::Error>{

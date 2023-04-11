@@ -27,6 +27,7 @@ pub enum X11Error{
     Unset,
 }
 
+
 use std::{thread,time};
 pub fn test(){
     println!("testing the x11 functions..");

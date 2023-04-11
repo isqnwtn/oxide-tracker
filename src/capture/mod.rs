@@ -1,10 +1,12 @@
 use crate::xfunc;
-mod data;
+mod metadata;
 mod file;
 
 pub use self::{
     file::check_dir,
     file::finish_lock,
+    metadata::FilePointers,
+    metadata::MetaData,
 };
 
 #[derive(Clone,Debug)]
