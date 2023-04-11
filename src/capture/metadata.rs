@@ -6,27 +6,13 @@ use crate::capture::CaptureError;
 use super::CaptureConfig;
 
 pub struct FilePointers{
-    meta: fs::File,
-    meta_read: fs::File,
     meta_path: PathBuf,
 }
 impl FilePointers{
     pub fn from_config(cc:&CaptureConfig)->Result<FilePointers,CaptureError>{
         let path = path::Path::new(&cc.data_path);
         let meta_path = path.join("meta").join("meta.dat");
-
-        let meta_file = fs::File::options()
-            .read(true)
-            .write(true)
-            .open(&meta_path)
-            .map_err(|_|CaptureError::FileError)?;
-
-        let meta_read_file = fs::File::open(&meta_path)
-            .map_err(|_|CaptureError::FileError)?;
-
         let fp = FilePointers{
-            meta: meta_file,
-            meta_read: meta_read_file,
             meta_path: meta_path,
         };
         Ok(fp)
@@ -87,13 +73,22 @@ impl MetaData{
           title_dat: TwoHash::new(),
         }
     }
+    // I'll have to create and destroy the file pointers each time rather than
+    // maintaining one across the program, this works and the other doesn't
+    // will also have to modify FilePointers (the name at least to account for this)
     pub fn load_from_file(fp: &mut FilePointers)->Result<MetaData,serde_json::Error>{
-        let file = fs::File::open(&fp.meta_path).expect("cant open meta file");
+        let file = fs::File::open(&fp.meta_path).expect("cant open meta file for reading");
         let reader = BufReader::new(file);
         serde_json::from_reader(reader)
     }
     pub fn save_changes(&mut self,fp: &mut FilePointers)->Result<(),serde_json::Error>{
-        serde_json::to_writer(&fp.meta, &self)
+        let file = fs::File::options()
+            .create(false)
+            .write(true)
+            .truncate(false)
+            .read(false)
+            .open(&fp.meta_path).expect("cannot open metafile for writing");
+        serde_json::to_writer(file, &self)
     }
     pub fn set_desks(&mut self,desks: Vec<String>){
         self.desk_dat = desks;
