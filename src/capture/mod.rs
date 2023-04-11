@@ -29,5 +29,7 @@ impl CaptureConfig{
             sample_rate: rate,
         }
     }
+    pub fn get_samplerate(&self)->usize{
+        self.sample_rate
+    }
 }
-

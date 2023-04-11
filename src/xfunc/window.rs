@@ -33,6 +33,19 @@ pub struct WinProp{
     w_desktop: Option<usize>,
     w_active: bool,
 }
+impl WinProp{
+    pub fn is_active(&self)->Option<(String,String,usize)>{
+        if !self.w_active{
+           None
+        }
+        else{
+            let title = self.w_title.clone()?;
+            let prog = self.w_program.clone()?;
+            let desk = self.w_desktop?;
+            Some((title,prog,desk))
+        }
+    }
+}
 
 impl Window{
     pub fn default_root_window(display: &Display) -> Self{
