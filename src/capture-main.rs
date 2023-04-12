@@ -1,9 +1,10 @@
-use std::{path, time, thread};
+use std::{path, time::{self, SystemTime}, thread};
 
 use capture::MetaData;
 
 use crate::capture::CaptureError;
 
+use chrono::{DateTime,Utc};
 
 mod xfunc;
 mod capture;
@@ -25,7 +26,6 @@ fn main()->Result<(),capture::CaptureError>{
     let (new,lockfile) = capture::check_dir(&config)?;
     let mut fp = capture::FilePointers::from_config(&config)?;
 
-    //xfunc::test();
     // setting up the environment
     let wait = time::Duration::from_secs(config.get_samplerate() as u64);
     let mut session = xfunc::Session::open().unwrap();
@@ -47,11 +47,12 @@ fn main()->Result<(),capture::CaptureError>{
 
     // infinite loop
     loop {
+        let now: DateTime<Utc> = Utc::now();
         let windows = session.get_client_list()
             .map_err(|x|CaptureError::ReadError(x))?;
         for w in windows{
             let (t,p,d) = skip_fail!(w.is_active());
-            println!("found: {} - {} - {}",t,p,d);
+            println!("found: {} => {} - {} - {}",now,t,p,d);
             let mut changed = metadata.add_pgm(&p);
             changed = metadata.add_title(&t) || changed;
             if changed{
